@@ -609,7 +609,7 @@ void User_options::readOptions(int argc, char *argv[], bool getFileNames, bool s
     if ( vm.count("grid") )
     {
         int const temp = this->gridSize.size();
-        if ( temp==1 ) this->gridSize.assign( NO_DIM, this->gridSize.at(0) );
+        if ( temp==1 ) this->gridSize.insert( this->gridSize.end(), NO_DIM - 1, this->gridSize.at(0) );
         else if ( temp!=NO_DIM ) throwError( "You can only insert 1 or ", NO_DIM, " values for the '-g [ --grid ]' option (e.g. '-g 256' or '-g 128 256 256')." );
         
         for (size_t i=0; i<this->gridSize.size(); ++i)
