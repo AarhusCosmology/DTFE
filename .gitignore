@@ -54,3 +54,7 @@ modules.order
 Module.symvers
 Mkfile.old
 dkms.conf
+external
+submodules/gmp-6.3.0
+submodules/gmp-6.3.0.tar.xz
+.DS_Store

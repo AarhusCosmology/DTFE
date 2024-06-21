@@ -1,14 +1,20 @@
 # Makefile for compiling the DTFE code on Linux systems
 
+# Get the absolute path of the Makefile
+MAKEFILE_PATH := $(abspath $(lastword $(MAKEFILE_LIST)))
+# Get the directory of the Makefile
+MAKEFILE_DIR := $(dir $(MAKEFILE_PATH))
+# Add /external to the directory path
+EXTERNAL_DIR := $(MAKEFILE_DIR)/external
 
 # Path to the GSL, Boost C++ and CGAL libraries - must be set by user (only if they aren't installed in the default system path) -- (NOTE: You must add only the directory where the libraries are installed, the program will add the '/lib' and '/include' parts automatically); C++ compiler - preferably a version that supports OpenMP
-GSL_PATH   = /cosma/local/gsl/2.4
-BOOST_PATH = /cosma/local/boost/gnu_7.3.0/1_67_0
-CGAL_PATH  = /cosma/home/dphlss/cautun/Programs/stow
-MPRF_PATH  = /cosma/home/dphlss/cautun/Programs/stow
+GSL_PATH   = $(EXTERNAL_DIR)
+BOOST_PATH = $(EXTERNAL_DIR)
+CGAL_PATH  = $(EXTERNAL_DIR)
+MPRF_PATH  = $(EXTERNAL_DIR)
 CC = g++
 # set the following if you have installed the HDF5 library and would like to read in HDF5 gadget files (you need to compile the HDF5 library with the '--enable-cxx' configure option)
-HDF5_PATH  = /cosma/local/hdf5/gnu_7.3.0/1.10.3
+HDF5_PATH  = $(EXTERNAL_DIR)
 
 
 # paths to where to put the object files and the executables files. If you build the DTFE library than you also need to specify the directory where to put the library and the directory where to copy the header files needed by the library (choose an empty directory for the header files).
@@ -49,7 +55,7 @@ OPTIONS += -DOUTPUT_FILE_DEFAULT=101
 
 ############################# additional compiler options ##################################
 # enable this option if to use OpenMP (share the workload between CPU cores sharing the same RAM)
-OPTIONS += -DOPEN_MP 
+OPTIONS += -DOPEN_MP -fopenmp
 # enable to check if the padding gives a complete Delaunay Tesselation of the region of interest
 # OPTIONS += -DTEST_PADDING 
 # enable this option to shift from position space to redshift space; You also need to activate this option during run-time using '--redshift-space arguments'
@@ -97,16 +103,16 @@ ifneq ($(strip $(CGAL_PATH)),)
 endif
 ifneq ($(strip $(HDF5_PATH)),)
 	INCLUDES += -I/$(strip $(HDF5_PATH))/include 
-	LIBRARIES += -L/$(strip $(HDF5_PATH))/lib -lhdf5 -lhdf5_cpp
+	LIBRARIES += -L/$(strip $(HDF5_PATH))/lib -lhdf5_cpp -lhdf5
 	OPTIONS += -DHDF5
 endif
 
 
 
-COMPILE_FLAGS = -frounding-math -O3 -fopenmp -DNDEBUG $(OPTIONS)
+COMPILE_FLAGS = -DBOOST_TIMER_ENABLE_DEPRECATED=1 -frounding-math -O3 -std=c++17 -DNDEBUG $(OPTIONS)
 DTFE_INC = $(INCLUDES)
 # the following libraries should work in most cases
-DTFE_LIB = $(LIBRARIES) -lCGAL -lboost_thread -lboost_filesystem -lboost_program_options -lgsl -lgslcblas -lm  -lgmp -lmpfr -lboost_system
+DTFE_LIB = $(LIBRARIES) -lboost_thread -lboost_filesystem -lboost_program_options -lgsl -lgslcblas -lgmp -lmpfr -lboost_system -lz -ldl -lm
 
 
 
