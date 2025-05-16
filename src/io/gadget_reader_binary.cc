@@ -116,8 +116,15 @@ void initializeGadget(std::string filename,
     int thisNoParts = 0;
     for (int i=0; i<6; ++i)
         thisNoParts += gadgetHeader->npart[i];
-    *noBytesPos = buffer3 / (3*thisNoParts);
-    *noBytesVel = buffer4 / (3*thisNoParts);
+    if (thisNoParts == 0) {
+      // Hail mary!
+      *noBytesPos = 4;
+      *noBytesVel = 4;
+    }
+    else {
+      *noBytesPos = buffer3 / (3*thisNoParts);
+      *noBytesVel = buffer4 / (3*thisNoParts);
+    }
     std::cout << "!!!! Number of bytes for position and velocity data: " << *noBytesPos << " and  " << *noBytesVel << ", respectively.\n" << std::flush;
 
 

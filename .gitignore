@@ -1,6 +1,9 @@
 /o
 DTFE
 /test
+/output/
+/output_test/
+/external/
 
 # Prerequisites
 *.d
