@@ -137,10 +137,10 @@ void NGP_interpolation_regular_grid(vector<Particle_data> &particles,
 
 
 /* This function counts how many particles are in each cell of a grid using the NGP method. */
-void NGP_particle_count(vector<Particle_data> &particles,
+void NGP_particle_count_bak(vector<Particle_data> &particles,
                         size_t const *nGrid,
                         Box box,
-                        vector<int> *counts)
+                        vector<size_t> *counts)
 {
     // allocate memory for the results
     size_t const reserveSize = (NO_DIM==2) ? nGrid[0]*nGrid[1] : nGrid[0]*nGrid[1]*nGrid[2];
@@ -173,5 +173,54 @@ void NGP_particle_count(vector<Particle_data> &particles,
 	}
 }
 
+/* This function counts how many particles are in each cell of a grid using the NGP method. */
+void NGP_particle_count(vector<Particle_data> &particles,
+                        size_t const nGrid[NO_DIM],
+                        Box box,
+                        vector<size_t>& counts)
+{
+    // Allocate memory for the results
+    size_t const reserveSize = (NO_DIM==2) ? nGrid[0]*nGrid[1] : nGrid[0]*nGrid[1]*nGrid[2];
+    counts.assign(reserveSize, int(0));
+
+    // Get the grid spacing
+    Real dx[NO_DIM];
+    for (int i=0; i<NO_DIM; ++i) {
+        dx[i] = (box[2*i+1] - box[2*i]) / nGrid[i];
+    }
+
+    // Find the particles in box 'box'
+    #pragma omp parallel for schedule(static)
+    for (size_t i = 0; i < particles.size(); ++i)
+    {
+        int cell[NO_DIM];
+        bool validCell = true;
+
+        for (int j=0; j<NO_DIM; ++j)
+        {
+            cell[j] = int(floor((particles[i].position(j) - box[2*j]) / dx[j]));
+            if (cell[j] < 0 || cell[j] >= nGrid[j])
+            {
+                validCell = false;
+            }
+        }
+
+        if (!validCell) continue;
+
+#if NO_DIM==2
+        size_t index = cell[0] * nGrid[1] + cell[1];
+#elif NO_DIM==3
+        size_t index = cell[0] * nGrid[1] * nGrid[2] + cell[1] * nGrid[2] + cell[2];
+#endif
+
+        if (index < 0 || index >= reserveSize) {
+            cerr << "ERROR: Index out of bounds! Index = " << index << ", ReserveSize = " << reserveSize << endl;
+            continue;
+        }
+
+        #pragma omp atomic
+        counts[index] += 1;
+    }
+}
 
 

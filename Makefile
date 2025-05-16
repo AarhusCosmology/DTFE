@@ -28,7 +28,7 @@ INC_DIR = ./DTFE_include
 ############################# Choose the compiler directives ##################################
 
 ############################# Overall options ##################################
-OPTIONS = 
+OPTIONS = -g
 #------------------------ set the number of spatial dimensions (2 or 3 dimensions)
 OPTIONS += -DNO_DIM=3 
 #------------------------ set type of variables - float (comment the next line) or double (uncomment the next line)
@@ -70,10 +70,10 @@ OPTIONS += -DREDSHIFT_SPACE
 #------------------------ compiler directive that affect only the help messages when using the '-h / --help' option (it does not affect the program in any other way)- if the option is uncommented, than it will show that set of options in the help menu
 OPTIONS += -DFIELD_OPTIONS 
 OPTIONS += -DREGION_OPTIONS 
-# OPTIONS += -DPARTITION_OPTIONS 
-# OPTIONS += -DPADDING_OPTIONS 
+OPTIONS += -DPARTITION_OPTIONS 
+OPTIONS += -DPADDING_OPTIONS 
 OPTIONS += -DAVERAGING_OPTIONS 
-# OPTIONS += -DREDSHIFT_CONE_OPTIONS 
+OPTIONS += -DREDSHIFT_CONE_OPTIONS 
 OPTIONS += -DADDITIONAL_OPTIONS 
 
 
@@ -103,16 +103,16 @@ ifneq ($(strip $(CGAL_PATH)),)
 endif
 ifneq ($(strip $(HDF5_PATH)),)
 	INCLUDES += -I/$(strip $(HDF5_PATH))/include 
-	LIBRARIES += -L/$(strip $(HDF5_PATH))/lib -lhdf5 -lhdf5_cpp
+	LIBRARIES += -L/$(strip $(HDF5_PATH))/lib -lhdf5_cpp -lhdf5
 	OPTIONS += -DHDF5
 endif
 
 
 
-COMPILE_FLAGS = -DBOOST_TIMER_ENABLE_DEPRECATED=1 -frounding-math -O3 -std=c++17 -DNDEBUG $(OPTIONS)
+COMPILE_FLAGS = -DBOOST_TIMER_ENABLE_DEPRECATED=1 -frounding-math -O2 -std=c++17 -DNDEBUG $(OPTIONS)
 DTFE_INC = $(INCLUDES)
 # the following libraries should work in most cases
-DTFE_LIB = $(LIBRARIES) -lboost_thread -lboost_filesystem -lboost_program_options -lgsl -lgslcblas -lm  -lgmp -lmpfr -lboost_system -lz
+DTFE_LIB = $(LIBRARIES) -lboost_thread -lboost_filesystem -lboost_program_options -lgsl -lgslcblas -lgmp -lmpfr -lboost_system -lz -ldl -lm
 
 
 
@@ -140,7 +140,7 @@ $(OBJ_DIR)/DTFE.o: $(addprefix $(SRC)/, $(DTFE_SOURCES)) Makefile
 	$(CC) $(COMPILE_FLAGS) $(DTFE_INC) -o $(OBJ_DIR)/DTFE.o -c $(SRC)/DTFE.cpp
 
 $(OBJ_DIR)/kdtree2.o: $(SRC)/kdtree/kdtree2.hpp $(SRC)/kdtree/kdtree2.cpp Makefile
-	$(CC) -O3 -ffast-math -fomit-frame-pointer $(DTFE_INC) -o $(OBJ_DIR)/kdtree2.o -c $(SRC)/kdtree/kdtree2.cpp
+	$(CC) -O2 -fomit-frame-pointer $(DTFE_INC) -o $(OBJ_DIR)/kdtree2.o -c $(SRC)/kdtree/kdtree2.cpp
 
 $(OBJ_DIR)/triangulation.o: $(addprefix $(SRC)/, $(TRIANG_SOURCES)) Makefile
 	$(CC) $(COMPILE_FLAGS) $(DTFE_INC) -o $(OBJ_DIR)/triangulation.o -c $(SRC)/CGAL_triangulation/triangulation.cpp
@@ -148,7 +148,7 @@ $(OBJ_DIR)/triangulation.o: $(addprefix $(SRC)/, $(TRIANG_SOURCES)) Makefile
 
 library: set_directories set_directories_2 $(addprefix $(SRC)/, $(LIB_FILES) ) copy_headers Makefile
 	$(CC) $(COMPILE_FLAGS) -fPIC $(DTFE_INC) -o $(OBJ_DIR)/DTFE_l.o -c $(SRC)/DTFE.cpp
-	$(CC) -O3 -ffast-math -fomit-frame-pointer -fPIC $(DTFE_INC) -o $(OBJ_DIR)/kdtree2_l.o -c $(SRC)/kdtree/kdtree2.cpp
+	$(CC) -O2 -fomit-frame-pointer -fPIC $(DTFE_INC) -o $(OBJ_DIR)/kdtree2_l.o -c $(SRC)/kdtree/kdtree2.cpp
 	$(CC) $(COMPILE_FLAGS) -fPIC $(DTFE_INC) -o $(OBJ_DIR)/triangulation_l.o -c $(SRC)/CGAL_triangulation/triangulation.cpp
 	$(CC) $(COMPILE_FLAGS) -shared $(OBJ_DIR)/DTFE_l.o $(OBJ_DIR)/triangulation_l.o $(OBJ_DIR)/kdtree2_l.o $(DTFE_LIB) -o $(LIB_DIR)/libDTFE.so
 

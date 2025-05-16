@@ -155,9 +155,9 @@ void insertParticlesInBox(std::vector<Particle_data> &p,
 
 
 void NGP_particle_count(std::vector<Particle_data> &particles,
-                        size_t const *nGrid,
+                        size_t const nGrid[NO_DIM],
 						Box box,
-                        std::vector<int> *counts);
+                        std::vector<size_t>& counts);
 
 /* Computes the optimal split of an array into noPartitions partition such that all partitions have as close as possible the same number of particles.*/
 void optimalSplit(std::vector<size_t> &counts,
@@ -244,8 +244,8 @@ void optimalPartitionSplit(std::vector<Particle_data> &particles,
 	
 	
 	// find how many particles are in each cell of the grid
-	std::vector<int> counts;
-	NGP_particle_count( particles, grid, userOptions.region, &counts);
+	std::vector<size_t> counts;
+	NGP_particle_count( particles, grid, userOptions.region, counts);
 	
 	// split along the x-direction
 	std::vector<size_t> xSplitIndices; xSplitIndices.assign( partition[0]+1, size_t(0) );

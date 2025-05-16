@@ -1,13 +1,17 @@
 #!/bin/bash
 set -e  # Exit immediately if a command exits with a non-zero status
 
-# Check if all submodules have been recursively cloned and initialized
-echo "Initializing and updating submodules..."
-git submodule update --init --recursive
-
 # Store the starting directory
 START_DIR=$(pwd)
 PREFIX="$START_DIR/../external"
+
+# Set CC and CXX environment variables
+export CC=gcc
+export CXX=g++
+
+# Check if all submodules have been recursively cloned and initialized
+echo "Initializing and updating submodules..."
+cd .. && git submodule update --init --recursive
 
 # Function to clean external directory
 clean_external() {
@@ -34,8 +38,8 @@ install_boost() {
 # Function to install GMP
 install_gmp() {
     echo "Installing GMP..."
-    wget https://gmplib.org/download/gmp/gmp-6.3.0.tar.xz
     cd "$START_DIR"
+    wget https://gmplib.org/download/gmp/gmp-6.3.0.tar.xz
     tar -xf gmp-6.3.0.tar.xz
     cd "$START_DIR/gmp-6.3.0"
     # Find the directory containing the m4 executable
@@ -70,10 +74,10 @@ install_hdf5() {
     make -j && make install
 }
 # Call installation functions
-clean_external
-install_gsl
-install_boost
-install_gmp
-install_mpfr
-install_cgal
+#clean_external
+#install_gsl
+#install_boost
+#install_gmp
+#install_mpfr
+#install_cgal
 install_hdf5
