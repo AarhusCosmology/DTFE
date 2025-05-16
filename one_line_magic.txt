@@ -1,0 +1,10 @@
+grep "OOM" slurm-20372832_* | grep -oP 'slurm-\d+_(\d+)\.out' | grep -oP '_\K\d+' | paste -sd,
+
+
+for num in 0.01 0.02 0.17 0.20 0.25 0.33 0.50 1.00; do sbatch --export=ALL,a="$num" jobscripts/runDTFE3000partition.sh; done
+
+for num in 0.01 0.02 0.17 0.20 0.25 0.33 0.50 1.00; do sbatch --export=ALL,SCALE_FACTOR="$num" jobscripts/split.sh; done
+
+for num in 0.01 0.02 0.17 0.20 0.25 0.33 0.50 1.00; do python check_dir.py "$num"; done
+
+
