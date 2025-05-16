@@ -73,11 +73,21 @@ install_hdf5() {
     cmake .. -DCMAKE_INSTALL_PREFIX="$PREFIX" -DHDF5_BUILD_CPP_LIB=ON
     make -j && make install
 }
+
+# Remove shared libraries from the external directory
+remove_shared_libs() {
+    echo "Removing shared libraries..."
+    find "$PREFIX" -name "*.so" -type f -delete
+    find "$PREFIX" -name "*.so.*" -type f -delete
+    find "$PREFIX" -name "*.dylib" -type f -delete
+}
+
 # Call installation functions
-#clean_external
-#install_gsl
-#install_boost
-#install_gmp
-#install_mpfr
-#install_cgal
+clean_external
+install_gsl
+install_boost
+install_gmp
+install_mpfr
+install_cgal
 install_hdf5
+remove_shared_libs
