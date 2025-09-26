@@ -1,0 +1,81 @@
+# Non-parameter variable used to control the size of the simulation
+_size = 2048
+
+# Input/output
+initial_conditions = {
+    'name'   : 'GADGET halo',
+    'species': 'matter',
+    'N'      : _size**3,
+}
+
+output_dirs = {
+    'snapshot' : f'{path.output_dir}/{param}_fixed',
+    'powerspec': ...,
+    'bispec'   : ...,
+#    'render3D' : ...,
+}
+output_times = {
+    'snapshot' : [0.01, 0.02, 0.17, 0.20, 0.25, 0.33, 0.50, 1],
+    'powerspec': ...,
+    'bispec'   : ...,
+#    'render3D' : ...,
+}
+powerspec_select = {
+    'matter': {'data': True, 'corrected': True, 'linear': True, 'plot': True},
+}
+bispec_select = {
+    'matter': {'data': True, 'reduced': True, 'tree-level': True, 'plot': True},
+}
+#render3D_select = {
+#    'matter': {'image': True},
+#}
+snapshot_type = 'gadget'
+
+# Numerics
+boxsize = 512*Mpc/h
+potential_options = _size
+
+powerspec_options = {
+    'upstream gridsize': {
+        'particles': '1*cbrt(N)',
+        'fluid': 'gridsize',
+    },
+}
+
+bispec_options = {
+   'upstream gridsize': {
+        'particles': '1*cbrt(Ñ)',
+        'fluid'    : 'gridsize',
+    },
+}
+
+primordial_amplitude_fixed = True
+
+# Cosmology
+H0      = 67.556*km/(s*Mpc)
+Ωb      = 0.022032/h**2
+Ωcdm    = 0.12038/h**2
+a_begin = 0.01
+primordial_spectrum = {
+    'A_s'  : 2.215e-9,
+    'n_s'  : 0.9619,
+    'pivot': 0.05/Mpc,
+}
+
+# Physics
+select_forces = {
+    'matter': {'gravity': 'pm'},
+}
+ 
+# Graphics
+#render3D_options = {
+#    'color': {
+#        'matter': 'inferno',
+#    },
+#    'background': {
+#        'matter': 'black',
+#    },
+#    'resolution': {
+#        'matter': 640,
+#    },
+#}
