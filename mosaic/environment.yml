@@ -1,0 +1,14 @@
+# Python environment for the mosaic pipeline:
+#     conda env create -f environment.yml && conda activate mosaic
+# On a cluster, mpi4py should use the cluster's MPI so that the MPI launcher
+# (srun/mpirun) works across nodes; see README.md.
+name: mosaic
+channels:
+  - conda-forge
+dependencies:
+  - python>=3.9
+  - numpy
+  - numba          # split_snapshot_in_regions.py
+  - mpi4py
+  - mpi4py-fft     # distributed FFT for mosaic_power.py (brings FFTW)
+  - openmpi
