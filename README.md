@@ -60,6 +60,14 @@ For detailed information about the DTFE method see [Schaap and van de Weygaert (
 * Extensive documentation of each feature.
 
 
+## Very large snapshots
+
+The [mosaic](mosaic/README.md) folder has scripts that cut a snapshot too large for a single
+node into regions, run DTFE on each region as a Slurm array job (using the option
+`--skipMissingFiles`) and compute the power spectrum of the resulting mosaic of grids with
+a distributed FFT.
+
+
 ## Contributors
 * **Marius Cautun (Kapteyn Astronomical Institute, Durham University, Leiden University)** - *code and documentation.*
 * **Rien van de Weygaert (Kapteyn Astronomical Institute)** - *various discussions about the method and implementation.*
