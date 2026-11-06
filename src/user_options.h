@@ -106,6 +106,7 @@ struct User_options
     
     std::vector<size_t> gridSize;// grid size along the 3 directions
     bool   periodic;      // true if the particle data is in a periodic boxBox
+    bool   skipMissingFiles;// true if missing files of a multi-file Gadget snapshot are skipped instead of being an error
     Box    boxCoordinates;// keeps track of the coordinates of the particle data box (of the full box)
     bool   userGivenBoxCoordinates;// true if the user inserted the coordinates of the box as an option to the program
     int    inputFileType;   // stores the type of the input file

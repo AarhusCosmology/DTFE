@@ -43,6 +43,7 @@
 User_options::User_options()
 {
     periodic = false;
+    skipMissingFiles = false;
     boxCoordinates.assign(0.);
     userGivenBoxCoordinates = false;
     inputFileType = INPUT_FILE_DEFAULT;     // the default input file - see makefile for definition
@@ -114,6 +115,7 @@ void User_options::addOptions(po::options_description &allOptions,
             ("input,i", po::value< std::vector<int> >()->multitoken(), "give the type of the input file (101=gadget multiple file, 102=gadget single file, 105=gadget HDF5 file, see documenation for more options). If present, a 2nd argument gives the data to be read from file (1=positions, 2=weights, 4=masses, ..., 2^n=the n+1 data) - e.g. to read positions, masses and velocities insert 1+2+4=7. If present, a 3rd argument gives the particle species to be read from file (1=1st species, 2=2nd species, ..., 2^n=the n+1 species) - e.g. to read the data of species 2,3 and 4 insert 2+4+8=14.")
             ("output,o", po::value< int >(&(this->outputFileType)), "give the type of the output file (101=binary file, 111=text file, see documenation for more options).")
             ("periodic,p", "particle data is in a periodic box with box coordinates given by option '--box' or read from input file.")
+            ("skipMissingFiles", "for Gadget snapshots in multiple files (input type 101): skip files 'snapshot.%i' that do not exist instead of stopping with an error. Useful for snapshots cut into regions (see the 'mosaic' folder), where a region has no particles from some of the original files.")
             ;
     
     
@@ -274,6 +276,7 @@ void User_options::shortHelp( char *progName )
             ("input,i", po::value< std::vector<int> >()->multitoken(), "give the type of the input file, which data to read and for which particle species. See full help for details.")
             ("output,o", po::value< std::vector<int> >(), "give the type of the output file. See full help for details.")
             ("periodic,p", "specify the data is in a periodic box.")
+            ("skipMissingFiles", "skip missing files of a multi-file Gadget snapshot.")
             ;
     po::options_description fieldOptions("Field choices");
     fieldOptions.add_options()
@@ -644,6 +647,8 @@ void User_options::readOptions(int argc, char *argv[], bool getFileNames, bool s
     }
     if ( vm.count("periodic") )
         this->periodic = true;
+    if ( vm.count("skipMissingFiles") )
+        this->skipMissingFiles = true;
     
     
     // read which field to compute using the DTFE method

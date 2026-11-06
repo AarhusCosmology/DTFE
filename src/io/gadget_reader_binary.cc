@@ -33,7 +33,8 @@ void countGadgetParticleNumber(std::string filenameRoot,
                                int const gadgetFileType,
                                bool const swapEndian,
                                int const verboseLevel,
-                               size_t numberTotalParticles[]);
+                               size_t numberTotalParticles[],
+                               bool const skipMissingFiles=false);
 
 // function that reads the data in a single gadget file - this function is called by the 'readGadgetFile_single' and 'readGadgetFile_multiple' to do the actual data reading
 void readGadgetData(std::string fileName,
@@ -71,7 +72,11 @@ void initializeGadget(std::string filename,
     bool singleFile = true;
     if ( not bfs::exists(fileName) ) //if this is true, than the input is in several files
     {
-        fileName = gadgetHeader->filename( filename, 0 );
+        int firstFile = 0;
+        if ( userOptions->skipMissingFiles )   // file 0 may be missing too: use the first file that exists
+            while ( firstFile<100000 and not bfs::exists( gadgetHeader->filename(filename, firstFile, false) ) )
+                ++firstFile;
+        fileName = gadgetHeader->filename( filename, firstFile );
         singleFile = false;
     }
 
@@ -148,7 +153,7 @@ void initializeGadget(std::string filename,
             numberTotalParticles[i] = gadgetHeader->npart[i];
     }
     else                  // for multiple files read the number of particles in each file and keep track of that
-        countGadgetParticleNumber( filename, gadgetHeader->num_files, *gadgetFileType, *swapEndian, userOptions->verboseLevel, numberTotalParticles );
+        countGadgetParticleNumber( filename, gadgetHeader->num_files, *gadgetFileType, *swapEndian, userOptions->verboseLevel, numberTotalParticles, userOptions->skipMissingFiles );
 
     // from that keep only the particles specified by the user (not all the particle species may be of interest)
     *noParticles = 0;   //total number of particles to be read from file
@@ -227,7 +232,9 @@ void readGadgetFile(std::string filename,
     // iterate over all the files and read the data
     for (int i=0; i<gadgetHeader.num_files; ++i )
     {
-        fileName = gadgetHeader.filename( filename, i );
+        fileName = gadgetHeader.filename( filename, i, not userOptions->skipMissingFiles );
+        if ( userOptions->skipMissingFiles and not bfs::exists(fileName) )
+            continue;
         message << "Reading GADGET snapshot file '" << fileName << "' which is file " << i+1 << " of " << gadgetHeader.num_files << " files...\n" << MESSAGE::Flush;
 
         // call the function that reads the data
@@ -261,17 +268,24 @@ void countGadgetParticleNumber(std::string filenameRoot,
                                int const gadgetFileType,
                                bool const swapEndian,
                                int const verboseLevel,
-                               size_t numberTotalParticles[])
+                               size_t numberTotalParticles[],
+                               bool const skipMissingFiles)
 {
     for (int i=0; i<6; ++i)
         numberTotalParticles[i] = 0;
     int offset = gadgetFileType==2 ? 16 : 0;
+    int noMissingFiles = 0;
 
     // loop over all the files and count the number of particles
     for (int i=0; i<noFiles; ++i)
     {
         Gadget_header gadgetHeader;
-        std::string fileName = gadgetHeader.filename( filenameRoot, i ); //get the filename for file i
+        std::string fileName = gadgetHeader.filename( filenameRoot, i, not skipMissingFiles ); //get the filename for file i
+        if ( skipMissingFiles and not bfs::exists(fileName) )
+        {
+            ++noMissingFiles;
+            continue;
+        }
 
         std::fstream inputFile;
         openInputBinaryFile( inputFile, fileName );
@@ -293,7 +307,9 @@ void countGadgetParticleNumber(std::string filenameRoot,
     }
 
     MESSAGE::Message message( verboseLevel );
-    message << "The data is in " << noFiles << " files and contains the following number of particles: " << numberTotalParticles[0] << " + "  << numberTotalParticles[1] << " + "  << numberTotalParticles[2] << " + "  << numberTotalParticles[3] << " + "  << numberTotalParticles[4] << " + "  << numberTotalParticles[5] << " .\n" << MESSAGE::Flush;
+    if ( noMissingFiles>0 )
+        message << "Skipped " << noMissingFiles << " missing files (option '--skipMissingFiles').\n";
+    message << "The data is in " << noFiles-noMissingFiles << " files and contains the following number of particles: " << numberTotalParticles[0] << " + "  << numberTotalParticles[1] << " + "  << numberTotalParticles[2] << " + "  << numberTotalParticles[3] << " + "  << numberTotalParticles[4] << " + "  << numberTotalParticles[5] << " .\n" << MESSAGE::Flush;
 }
 
 
