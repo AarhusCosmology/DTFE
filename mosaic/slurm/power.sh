@@ -23,7 +23,7 @@ esac
 
 echo "=== $(date): power spectrum of $field on $SLURM_NTASKS ranks"
 $MPIRUN -n "$SLURM_NTASKS" python "$MOSAIC_DIR/mosaic_power.py" \
-    "$DTFE_DIR/mosaic_r_0_0_0.$suffix" "$RUN_DIR/power_${field}.txt" --box "$BOX" --norm "$NORM"
+    "$DTFE_DIR/mosaic_r_0_0_0.$suffix" "$RUN_DIR/power_${field}.txt" --box "$BOX" --norm "$NORM" --hubble "$HUBBLE"
 status=$?
 echo "=== $(date): finished with exit code $status"
 exit $status

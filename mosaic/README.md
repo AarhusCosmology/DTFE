@@ -46,15 +46,15 @@ useful for small snapshots and for testing.
 ## Usage
 
 ```
-python mosaic/run_mosaic.py SNAPSHOT RUNDIR --box L --particles NP [--fields div vort] [--norm 3e5]
+python mosaic/run_mosaic.py SNAPSHOT RUNDIR --box L --particles NP --hubble h [--fields div vort] [--norm 3e5]
 ```
 
 For example, the velocity divergence and vorticity of a CONCEPT simulation with 4096³
-particles in a 2048 Mpc/h box:
+particles in a 2048 Mpc/h box with h = 0.67556:
 
 ```
 python mosaic/run_mosaic.py /home/camtgs/concept/output/p4096_b2048_pm_z99_fixed/snapshot_a=1.00/snapshot \
-       /scratch/mosaic/p4096_b2048_a1.00 --box 2048 --particles 4096 --norm 3e5
+       /scratch/mosaic/p4096_b2048_a1.00 --box 2048 --particles 4096 --hubble 0.67556
 ```
 
 Everything for the run ends up in `RUNDIR`: the settings (`run.env`), the sub-snapshots
@@ -79,16 +79,24 @@ the sub-snapshots of the regions that succeeded have already been deleted.
 
 `mosaic_power.py` can also be used on its own on any mosaic of DTFE binary files:
 ```
-mpirun -n 16 python mosaic/mosaic_power.py dtfe/mosaic_r_0_0_0.a_velDiv power_div.txt --box 1024
+mpirun -n 16 python mosaic/mosaic_power.py dtfe/mosaic_r_0_0_0.a_velDiv power_div.txt --box 1024 \
+       --norm 3e5 --hubble 0.67556
 ```
+Without `--hubble` it writes k and P in units of the box (h/Mpc and Mpc/h), and its
+default `--norm` is 1.
 
 ## Output
 
-`power_<field>.txt` has three columns: k [h/Mpc], P(k) and the number of modes in the bin.
-For the vorticity, P is the sum over its three components. P is divided by `norm`²; with
-velocities in km/s, `--norm 3e5` expresses them in units of c. The binning is the same as
-nbodykit's `FFTPower(mode='1d')` with default settings, and the results agree with
-nbodykit to float32 precision. Bins have width 2π/L and start at k = 0, k is the mean |k|
+`power_<field>.txt` has three columns: k [1/Mpc], P(k) [Mpc] and the number of modes in
+the bin. For the vorticity, P is the sum over its three components.
+
+DTFE runs with the box in Mpc/h and gives the divergence and vorticity in km/s per Mpc/h,
+so the power spectrum is first computed in h/Mpc and Mpc/h. At the end k is multiplied by
+h and P divided by h (`--hubble`), which gives k in 1/Mpc and P in Mpc. P is also divided
+by `norm`², where the default `--norm 3e5` expresses the velocities in units of c.
+`--hubble 1` keeps the h-units. The binning is the same as nbodykit's
+`FFTPower(mode='1d')` with default settings, and the results agree with nbodykit to
+float32 precision. Bins have width 2π/L and start at k = 0, k is the mean |k|
 of the modes in a bin, and the k = 0 mode is counted in the first bin with zero power.
 
 ## Resources
