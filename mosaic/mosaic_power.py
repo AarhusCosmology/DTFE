@@ -15,8 +15,16 @@ bins of width 2*pi/L starting at k=0, k is the mean |k| of the modes in a bin,
 modes on the kz=0 and Nyquist planes count once and all others twice, and the
 k=0 mode has zero power but is counted.
 
+Units: k is in 1/box unit and P(k) in box unit^3 x field^2 / norm^2, i.e. h/Mpc
+and (Mpc/h)^3 for a box in Mpc/h. With --hubble h (box in Mpc/h), lengths are
+converted to Mpc at the end: k -> k h and P -> P h^(2m-3), where the field has
+m powers of 1/length (m = 1 for the velocity divergence and vorticity, whose
+DTFE values are in km/s per Mpc/h, and m = 0 for the velocity in km/s).
+For the divergence and vorticity with --norm 3e5 this gives k in 1/Mpc and
+P(k) in Mpc, i.e. k h and P/h of the spectrum in h/Mpc and Mpc/h.
+
 Usage
-    mpirun -n P python mosaic_power.py CUBE0 OUTPUT --box L [options]
+    mpirun -n P python mosaic_power.py CUBE0 OUTPUT --box L [--hubble h] [options]
 
 CUBE0 is any file name that contains r_0_0_0 (or {ix}, {iy}, {iz}
 placeholders). The P ranks form a Px x Py process grid (default: as square as
@@ -36,6 +44,9 @@ from mpi4py import MPI
 # values per cell for DTFE's binary output files (file suffix -> components)
 COMPONENTS = {'den': 1, 'a_den': 1, 'velDiv': 1, 'a_velDiv': 1,
               'vel': 3, 'a_vel': 3, 'velVort': 3, 'a_velVort': 3}
+# powers of 1/length in the velocity fields (km/s and km/s per Mpc/h), for --hubble; the density is
+# left out because its unit also depends on the mass unit
+INVERSE_LENGTHS = {'velDiv': 1, 'a_velDiv': 1, 'velVort': 1, 'a_velVort': 1, 'vel': 0, 'a_vel': 0}
 
 
 def parse_args(argv=None):
@@ -43,7 +54,12 @@ def parse_args(argv=None):
     p.add_argument('cube0', help="path of cube (0,0,0), containing 'r_0_0_0' or {ix}/{iy}/{iz} placeholders")
     p.add_argument('output', help='output text file')
     p.add_argument('--box', type=float, required=True,
-                   help='side length of the full box; k is in units of 1/box unit (h/Mpc for Mpc/h)')
+                   help='side length of the full box; k is in units of 1/box unit (h/Mpc for Mpc/h) '
+                        'unless --hubble is given')
+    p.add_argument('--hubble', type=float,
+                   help='h = H0/(100 km/s/Mpc). With the box in Mpc/h, write k in 1/Mpc and P(k) with lengths in '
+                        'Mpc: k*h and P/h for the velocity divergence and vorticity (P/h^3 for the velocity; '
+                        'not for the density). Default: no conversion')
     p.add_argument('--components', type=int, choices=[1, 3],
                    help='values per cell (default: from the DTFE file suffix, else from the file size)')
     p.add_argument('--norm', type=float, default=1.0,
@@ -163,6 +179,13 @@ def main(argv=None):
     t0 = time.time()
 
     pattern = file_pattern(args.cube0)
+    inverse_lengths = INVERSE_LENGTHS.get(pattern.rsplit('.', 1)[-1])
+    if args.hubble is not None:
+        if args.hubble <= 0:
+            raise SystemExit(f'--hubble must be positive, got {args.hubble}')
+        if inverse_lengths is None:
+            raise SystemExit(f"--hubble: no conversion to Mpc known for field '{pattern.rsplit('.', 1)[-1]}' "
+                             f"(only for {', '.join(INVERSE_LENGTHS)})")
     info = None
     if rank == 0:
         try:
@@ -233,8 +256,16 @@ def main(argv=None):
             power = psum[sl] / nsum[sl] / args.norm**2
         header = (f'power spectrum of {pattern}\n'
                   f'{N}^3 cubes of {cube}^3 cells, grid {G}^3, box {args.box}, {ncomp} component(s) summed, '
-                  f'P divided by norm^2 with norm = {args.norm}\n'
-                  f'k [1/box unit]   P(k) [box unit^3 * field^2 / norm^2]   modes')
+                  f'P divided by norm^2 with norm = {args.norm}\n')
+        if args.hubble is None:
+            header += 'k [1/box unit]   P(k) [box unit^3 * field^2 / norm^2]   modes'
+        else:
+            p = 2 * inverse_lengths - 3
+            k = k * args.hubble
+            power = power * args.hubble**p
+            mpc = 'Mpc' if p == -1 else f'Mpc^{-p}'
+            header += (f'box in Mpc/h converted to Mpc with h = {args.hubble}: k -> k h, P -> P h^{p}\n'
+                       f'k [1/Mpc]   P(k) [{mpc} (km/s)^2 / norm^2]   modes')
         os.makedirs(os.path.dirname(os.path.abspath(args.output)), exist_ok=True)
         np.savetxt(args.output, np.c_[k, power, nsum[sl]], header=header)
         print(f'Wrote {args.output} ({len(k)} bins) in {time.time() - t0:.1f} s; '

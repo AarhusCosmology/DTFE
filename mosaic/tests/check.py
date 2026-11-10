@@ -4,6 +4,7 @@
     check.py same A B [--rtol R]            two spectra agree (same bins and modes, P within R)
     check.py model PK BOX NCOMP             spectrum agrees with make_mosaic.model_power
     check.py numpy PK FULL.npy BOX          spectrum agrees with a single-process numpy FFT of the full field
+    check.py hubble PK_MPC PK_H H           PK_MPC (written with --hubble H) is k*H, P/H of PK_H (h-units)
 """
 import os
 import sys
@@ -66,12 +67,26 @@ def numpy_reference(pk, full_npy, box):
     print(f'ok: agrees with single-process numpy FFT to {err:.1e}')
 
 
+def hubble(pk_mpc, pk_h, h):
+    a, b = np.loadtxt(pk_mpc), np.loadtxt(pk_h)
+    if a.shape != b.shape or not np.array_equal(a[:, 2], b[:, 2]):
+        fail('different bins or mode counts')
+    if not np.allclose(a[:, 0], b[:, 0] * h, rtol=1e-12, atol=0):
+        fail(f'k is not k*h with h = {h}')
+    err = np.max(np.abs(a[1:, 1] / (b[1:, 1] / h) - 1))
+    if err > 1e-6:                                  # float32 FFTs of two runs differ at ~1e-8
+        fail(f'P is not P/h with h = {h} (relative difference {err:.1e})')
+    print(f'ok: k -> k h and P -> P/h with h = {h} (P to {err:.1e})')
+
+
 if __name__ == '__main__':
     cmd, args = sys.argv[1], sys.argv[2:]
     if cmd == 'same':
         same(args[0], args[1], float(args[3]) if len(args) > 3 and args[2] == '--rtol' else 1e-5)
     elif cmd == 'model':
         model(args[0], float(args[1]), int(args[2]))
+    elif cmd == 'hubble':
+        hubble(args[0], args[1], float(args[2]))
     elif cmd == 'numpy':
         numpy_reference(args[0], args[1], float(args[2]))
     else:

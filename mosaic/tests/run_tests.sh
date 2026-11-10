@@ -29,13 +29,17 @@ for nc in 1 3; do
     echo "--- $nc component(s): vs numpy FFT of the full field, and vs the input power spectrum"
     check numpy "pk${nc}_np4.txt" "mosaic$nc/test_full.npy" 100
     check model "pk${nc}_np4.txt" 100 $nc
+    echo "--- $nc component(s): --hubble converts to k in 1/Mpc and P in Mpc"
+    $MPIRUN -n 4 python "$MOSAIC/mosaic_power.py" "mosaic$nc/test_r_0_0_0.$suffix" "pk${nc}_mpc.txt" \
+        --box 100 --hubble 0.7 > "log_power${nc}_mpc.txt" 2>&1 || { echo "FAIL: mosaic_power.py --hubble"; failed=1; }
+    check hubble "pk${nc}_mpc.txt" "pk${nc}_np4.txt" 0.7
 done
 
 if [ -x "$DTFE" ]; then
     echo "=== full chain: split -> DTFE -> power (run_mosaic.py --local) vs DTFE on the whole box"
     python "$HERE/make_snapshot.py" snap --particles 64 --box 64000 --files 8 > /dev/null || failed=1
     MPIRUN="$MPIRUN" python "$MOSAIC/run_mosaic.py" snap/snapshot run --box 64 --particles 64 --cube 32 \
-        --local --site "$HERE/site_test.sh" --dtfe "$DTFE" > log_chain.txt 2>&1 \
+        --hubble 0.7 --norm 3e5 --local --site "$HERE/site_test.sh" --dtfe "$DTFE" > log_chain.txt 2>&1 \
         || { echo "FAIL: run_mosaic.py, see $WORK/log_chain.txt"; failed=1; }
     grep -h "Skipped" run/local-dtfe_0.out
     mkdir -p full
@@ -44,7 +48,7 @@ if [ -x "$DTFE" ]; then
     for f in div vort; do
         suffix=$([ $f = div ] && echo a_velDiv || echo a_velVort)
         $MPIRUN -n 1 python "$MOSAIC/mosaic_power.py" "full/whole_r_0_0_0.$suffix" "pk_whole_$f.txt" --box 64 \
-            > /dev/null 2>&1 || failed=1
+            --hubble 0.7 --norm 3e5 > /dev/null 2>&1 || failed=1
         echo "--- $f: mosaic vs whole box (differences are DTFE's Monte Carlo sampling noise)"
         check same "run/power_$f.txt" "pk_whole_$f.txt" --rtol 0.02
     done

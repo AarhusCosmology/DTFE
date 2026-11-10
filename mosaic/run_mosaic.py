@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Run the split -> DTFE -> power spectrum chain for a large Gadget snapshot.
 
-    python run_mosaic.py SNAPSHOT RUNDIR --box L --particles NP [options]
+    python run_mosaic.py SNAPSHOT RUNDIR --box L --particles NP --hubble h [options]
 
 SNAPSHOT is the multi-file snapshot without its file number: the files are
 SNAPSHOT.0, SNAPSHOT.1, ... RUNDIR is created and receives everything for this
@@ -17,7 +17,9 @@ launcher.log.
              sub-snapshots are deleted afterwards unless --keep-split.
   3. power   (one MPI job per field, slurm/power.sh):
              P(k) of the full grid with mosaic_power.py, on N^2 ranks or more if
-             they would need more than --power-mem GB each.
+             they would need more than --power-mem GB each. The box is in Mpc/h,
+             and the spectra are converted to k in 1/Mpc and P in Mpc at the
+             end (k h and P/h), with velocities in units of --norm (c).
 
 Each step waits for the previous one (afterok). With --start-at you can redo
 later steps, and with --local the same job scripts run one after another on
@@ -48,14 +50,17 @@ def parse_args(argv=None):
                    help='box size in units of 1000 x the position unit, i.e. Mpc/h for positions in kpc/h '
                         '(DTFE assumes 1 Mpc = 1000 position units)')
     p.add_argument('--particles', type=int, required=True, help='particles per dimension in the snapshot')
+    p.add_argument('--hubble', type=float, required=True,
+                   help='h = H0/(100 km/s/Mpc) of the simulation; the spectra are written with k in 1/Mpc and '
+                        'P in Mpc, i.e. k*h and P/h of the spectra in h/Mpc and Mpc/h (--hubble 1 keeps h-units)')
     p.add_argument('--grid', type=int, help='grid cells per dimension of the full box (default: particles)')
     p.add_argument('--cube', type=int, default=512, help='grid cells per dimension of one region (default 512)')
     p.add_argument('--ghost', type=float, default=5.0,
                    help='ghost zone around each region in mean particle separations (default 5)')
     p.add_argument('--fields', nargs='+', choices=sorted(FIELDS), default=['div', 'vort'],
                    help='fields for DTFE and the power spectrum (default: div vort)')
-    p.add_argument('--norm', type=float, default=1.0,
-                   help='divide P(k) by norm^2, e.g. 3e5 for velocities in units of c (default 1)')
+    p.add_argument('--norm', type=float, default=3e5,
+                   help='divide P(k) by norm^2; the default, 3e5, gives the velocities in units of c (km/s)')
     p.add_argument('--dtfe', default=os.path.join(MOSAIC_DIR, '..', 'DTFE'),
                    help='DTFE executable (default: the one built in the repository)')
     p.add_argument('--dtfe-options', default='--samples 1000 --method 1',
@@ -194,6 +199,7 @@ def main(argv=None):
         'PADDING': f'{padding:.8g}',
         'KEEP_SPLIT': int(a.keep_split),
         'NORM': a.norm,
+        'HUBBLE': a.hubble,
     }
     env_file = os.path.join(rundir, 'run.env')
     env_text = ''.join(f'{k}={shlex.quote(str(v))}\n' for k, v in settings.items())
@@ -208,6 +214,7 @@ def main(argv=None):
     L.log(f'=== {time.strftime("%Y-%m-%d %H:%M:%S")}: {" ".join(shlex.quote(x) for x in sys.argv)}')
     L.log(f'grid {grid}^3 = {nreg}^3 regions of {a.cube}^3, ghost zone {padding:.6g} (box units), '
           f'fields {a.fields}, start at {a.start_at}' + (', local' if a.local else ''))
+    L.log(f'spectra in k [1/Mpc] and P [Mpc] with h = {a.hubble} (box {a.box} Mpc/h), velocities / {a.norm:g}')
     L.log(f'power spectrum on {ranks} ranks needs about {power_memory(ranks):.1f} GB per rank '
           f'(change with --power-ranks)')
     if power_memory(ranks) > a.power_mem:
