@@ -19,7 +19,8 @@ launcher.log.
              P(k) of the full grid with mosaic_power.py, on N^2 ranks or more if
              they would need more than --power-mem GB each. The box is in Mpc/h,
              and the spectra are converted to k in 1/Mpc and P in Mpc at the
-             end (k h and P/h), with velocities in units of --norm (c).
+             end (k h and P/h), with velocities in units of --norm (c). With
+             --unfold the window of DTFE's cell average is divided out.
 
 Each step waits for the previous one (afterok). With --start-at you can redo
 later steps, and with --local the same job scripts run one after another on
@@ -61,6 +62,9 @@ def parse_args(argv=None):
                    help='fields for DTFE and the power spectrum (default: div vort)')
     p.add_argument('--norm', type=float, default=3e5,
                    help='divide P(k) by norm^2; the default, 3e5, gives the velocities in units of c (km/s)')
+    p.add_argument('--unfold', action='store_true',
+                   help="divide out the window of DTFE's average over one grid cell, prod_i sinc^2(k_i d/2), "
+                        'in the power spectra (mosaic_power.py --unfold; default: off)')
     p.add_argument('--dtfe', default=os.path.join(MOSAIC_DIR, '..', 'DTFE'),
                    help='DTFE executable (default: the one built in the repository)')
     p.add_argument('--dtfe-options', default='--samples 1000 --method 1',
@@ -200,6 +204,7 @@ def main(argv=None):
         'KEEP_SPLIT': int(a.keep_split),
         'NORM': a.norm,
         'HUBBLE': a.hubble,
+        'UNFOLD': int(a.unfold),
     }
     env_file = os.path.join(rundir, 'run.env')
     env_text = ''.join(f'{k}={shlex.quote(str(v))}\n' for k, v in settings.items())
@@ -214,7 +219,8 @@ def main(argv=None):
     L.log(f'=== {time.strftime("%Y-%m-%d %H:%M:%S")}: {" ".join(shlex.quote(x) for x in sys.argv)}')
     L.log(f'grid {grid}^3 = {nreg}^3 regions of {a.cube}^3, ghost zone {padding:.6g} (box units), '
           f'fields {a.fields}, start at {a.start_at}' + (', local' if a.local else ''))
-    L.log(f'spectra in k [1/Mpc] and P [Mpc] with h = {a.hubble} (box {a.box} Mpc/h), velocities / {a.norm:g}')
+    L.log(f'spectra in k [1/Mpc] and P [Mpc] with h = {a.hubble} (box {a.box} Mpc/h), velocities / {a.norm:g}'
+          + (', cell-average window unfolded' if a.unfold else ''))
     L.log(f'power spectrum on {ranks} ranks needs about {power_memory(ranks):.1f} GB per rank '
           f'(change with --power-ranks)')
     if power_memory(ranks) > a.power_mem:

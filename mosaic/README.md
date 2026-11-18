@@ -68,6 +68,8 @@ the Slurm logs and `launcher.log`. Useful options:
   estimated memory per rank fits in `--power-mem` (24 GB).
 * `--keep-split` keeps the sub-snapshots; by default each region's sub-snapshots are
   deleted as soon as its DTFE run has succeeded.
+* `--unfold` divides out the window of DTFE's cell average in the spectra (see Output).
+  It only affects the power step, so `--start-at power --unfold` adds it to a finished run.
 * `--local --site slurm/site_local.sh` runs everything on this machine.
 
 The grid has one cell per particle per dimension (`--grid` to change) and each region is
@@ -83,7 +85,7 @@ mpirun -n 16 python mosaic/mosaic_power.py dtfe/mosaic_r_0_0_0.a_velDiv power_di
        --norm 3e5 --hubble 0.67556
 ```
 Without `--hubble` it writes k and P in units of the box (h/Mpc and Mpc/h), and its
-default `--norm` is 1.
+default `--norm` is 1. `--unfold` works the same way as in `run_mosaic.py`.
 
 ## Output
 
@@ -98,6 +100,26 @@ by `norm`², where the default `--norm 3e5` expresses the velocities in units of
 `FFTPower(mode='1d')` with default settings, and the results agree with nbodykit to
 float32 precision. Bins have width 2π/L and start at k = 0, k is the mean |k|
 of the modes in a bin, and the k = 0 mode is counted in the first bin with zero power.
+
+### Unfolding the cell-average window (`--unfold`)
+
+The fields `divergence_a` and `vorticity_a` are the DTFE field averaged over each grid
+cell. Since the DTFE velocity is continuous across the faces of the tetrahedra, this
+average is the DTFE field convolved with a cubic top hat of one cell (side d = L/G) and
+sampled at the cell centres, the same for every cell. Each Fourier mode is therefore
+multiplied by W(k) = ∏ᵢ sin(kᵢd/2)/(kᵢd/2), the NGP window, and P(k) by W². Averaged over
+a shell, this lowers P by 5%, 19% and 58% at 1/4, 1/2 and 1 times the Nyquist wavenumber,
+and by about (kd)²/12 at small k. With `--unfold`, |f_k|² of each mode is divided by W(k)²
+before the binning. This is exact up to aliasing near the Nyquist wavenumber. It does not
+correct the smoothing of the DTFE interpolation itself, whose scale follows the local
+particle separation. The point-sampled fields (`velDiv`, `velVort`, ...) have no window,
+and `--unfold` refuses them. The option is off by default, so that the spectra stay
+comparable with nbodykit's `FFTPower` on the same grid.
+
+DTFE on a test snapshot (128³ particles on a jittered lattice, moving with eight
+longitudinal plane waves, on a 16³ grid) gives Fourier modes of `divergence_a` that agree
+with W(k) times the analytic divergence to within 1% up to 0.88 times the Nyquist
+wavenumber, with no phase shift and no coupling between modes.
 
 ## Resources
 
@@ -134,12 +156,16 @@ vorticity of a 4096³ grid).
 * the power spectrum of a synthetic Gaussian mosaic, with 1 and 3 components, is the
   same on 1, 4 and 6 ranks, agrees with a single-process numpy FFT and recovers the
   input power spectrum;
+* `--unfold` on a synthetic mosaic whose modes were multiplied by the cell-average window
+  gives the spectrum of the field without the window (to float32 precision), and it is
+  refused for a point-sampled field;
 * the whole chain (split, DTFE, power) on a small snapshot with 64³ particles in 2³
   regions, run through `run_mosaic.py --local`, against DTFE on the whole box. The
   spectra agree to 0.3%. The remaining difference comes from DTFE's Monte Carlo
   sampling, since the sample points depend on the order of the particles. The
   non-averaged divergence of the mosaic is identical to that of the whole box in every
-  cell.
+  cell. The power step is then rerun with `--unfold` and compared with the unfolded
+  spectra of the whole box.
 
 In addition, `mosaic_power.py` was compared with nbodykit 0.3.15 (`FFTPower` on the full
 field, and the earlier nbodykit/pmesh-based mosaic script). The mode counts and k values

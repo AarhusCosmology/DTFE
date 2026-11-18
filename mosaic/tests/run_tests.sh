@@ -35,6 +35,28 @@ for nc in 1 3; do
     check hubble "pk${nc}_mpc.txt" "pk${nc}_np4.txt" 0.7
 done
 
+echo "=== --unfold divides out the window of a one-cell average"
+for nc in 1 3; do
+    suffix=$([ $nc = 1 ] && echo a_velDiv || echo a_velVort)
+    python "$HERE/make_mosaic.py" "window$nc" --cubes 4 --cube 16 --box 100 --components $nc --window > /dev/null \
+        || failed=1
+    $MPIRUN -n 4 python "$MOSAIC/mosaic_power.py" "window$nc/test_r_0_0_0.$suffix" "pk${nc}_unfold.txt" \
+        --box 100 --unfold > "log_unfold$nc.txt" 2>&1 || { echo "FAIL: mosaic_power.py --unfold"; failed=1; }
+    echo "--- $nc component(s): unfolded spectrum of the windowed field vs numpy FFT of the field without window"
+    check numpy "pk${nc}_unfold.txt" "window$nc/test_nowindow.npy" 100
+done
+echo "--- --unfold is refused for a point-sampled field, which has no window"
+mkdir -p point
+for f in mosaic1/test_r_*.a_velDiv; do ln -sf "../$f" "point/$(basename "$f" .a_velDiv).velDiv"; done
+if $MPIRUN -n 1 python "$MOSAIC/mosaic_power.py" point/test_r_0_0_0.velDiv pk_point.txt --box 100 --unfold \
+        > log_point.txt 2>&1; then
+    echo "FAIL: --unfold was accepted for velDiv"; failed=1
+elif grep -q "point-sampled" log_point.txt; then
+    echo "ok: --unfold refused for velDiv"
+else
+    echo "FAIL: mosaic_power.py --unfold on velDiv failed without saying why, see $WORK/log_point.txt"; failed=1
+fi
+
 if [ -x "$DTFE" ]; then
     echo "=== full chain: split -> DTFE -> power (run_mosaic.py --local) vs DTFE on the whole box"
     python "$HERE/make_snapshot.py" snap --particles 64 --box 64000 --files 8 > /dev/null || failed=1
@@ -51,6 +73,17 @@ if [ -x "$DTFE" ]; then
             --hubble 0.7 --norm 3e5 > /dev/null 2>&1 || failed=1
         echo "--- $f: mosaic vs whole box (differences are DTFE's Monte Carlo sampling noise)"
         check same "run/power_$f.txt" "pk_whole_$f.txt" --rtol 0.02
+    done
+    echo "--- run_mosaic.py --unfold passes --unfold to the power step (power step rerun only)"
+    MPIRUN="$MPIRUN" python "$MOSAIC/run_mosaic.py" snap/snapshot run --box 64 --particles 64 --cube 32 \
+        --hubble 0.7 --norm 3e5 --unfold --start-at power --local --site "$HERE/site_test.sh" --dtfe "$DTFE" \
+        > log_chain_unfold.txt 2>&1 || { echo "FAIL: run_mosaic.py --unfold, see $WORK/log_chain_unfold.txt"; failed=1; }
+    for f in div vort; do
+        suffix=$([ $f = div ] && echo a_velDiv || echo a_velVort)
+        $MPIRUN -n 1 python "$MOSAIC/mosaic_power.py" "full/whole_r_0_0_0.$suffix" "pk_whole_${f}_unfold.txt" \
+            --box 64 --hubble 0.7 --norm 3e5 --unfold > /dev/null 2>&1 || failed=1
+        echo "--- $f: unfolded mosaic vs unfolded whole box"
+        check same "run/power_$f.txt" "pk_whole_${f}_unfold.txt" --rtol 0.02
     done
 else
     echo "=== skipping the full-chain test: no DTFE executable at $DTFE"

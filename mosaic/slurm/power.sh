@@ -21,9 +21,13 @@ case "$field" in
     *)    echo "unknown field '$field'"; exit 1 ;;
 esac
 
+unfold=()
+[ "${UNFOLD:-0}" = 1 ] && unfold=(--unfold)    # run.env files from before --unfold have no UNFOLD
+
 echo "=== $(date): power spectrum of $field on $SLURM_NTASKS ranks"
 $MPIRUN -n "$SLURM_NTASKS" python "$MOSAIC_DIR/mosaic_power.py" \
-    "$DTFE_DIR/mosaic_r_0_0_0.$suffix" "$RUN_DIR/power_${field}.txt" --box "$BOX" --norm "$NORM" --hubble "$HUBBLE"
+    "$DTFE_DIR/mosaic_r_0_0_0.$suffix" "$RUN_DIR/power_${field}.txt" --box "$BOX" --norm "$NORM" --hubble "$HUBBLE" \
+    "${unfold[@]}"
 status=$?
 echo "=== $(date): finished with exit code $status"
 exit $status
