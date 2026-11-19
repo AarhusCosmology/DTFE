@@ -113,7 +113,7 @@ inline Pvector<Real,noVelComp> velocityValue(Real velGrad[][noVelComp],
     {
         temp[i] = 0.;
         for (int j=0; j<NO_DIM; ++j)
-            temp[i] = velGrad[j][i] * samplePoint[j];
+            temp[i] += velGrad[j][i] * samplePoint[j];
     }
     
     return temp + base->info().velocity();
@@ -156,7 +156,7 @@ Pvector<Real,noScalarComp> scalarValue(Real sGrad[][noScalarComp],
     {
         temp[i] = 0.;
         for (size_t j=0; j<NO_DIM; ++j)
-            temp[i] = sGrad[j][i] * samplePoint[j];
+            temp[i] += sGrad[j][i] * samplePoint[j];
     }
     
     return temp + base->info().myScalar();
