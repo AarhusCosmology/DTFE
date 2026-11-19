@@ -23,6 +23,16 @@ DTFE values are in km/s per Mpc/h, and m = 0 for the velocity in km/s).
 For the divergence and vorticity with --norm 3e5 this gives k in 1/Mpc and
 P(k) in Mpc, i.e. k h and P/h of the spectrum in h/Mpc and Mpc/h.
 
+Unfolding: DTFE's cell-averaged fields (a_*) are the DTFE field averaged over
+each grid cell, i.e. convolved with a cubic top hat of one cell (side d = L/G)
+and sampled at the cell centres. This multiplies each Fourier mode by
+W(k) = prod_i sin(k_i d/2)/(k_i d/2), the NGP window, so P(k) is suppressed by
+W^2 (5%, 19% and 58% on average at 1/4, 1/2 and 1 times the Nyquist
+wavenumber). With --unfold, |f_k|^2 of each mode is divided by W(k)^2 before
+the binning. This is exact up to aliasing. It does not correct the smoothing of
+the DTFE interpolation itself, which is adaptive. The point-sampled fields
+(den, velDiv, vel, velVort) have no such window and are refused.
+
 Usage
     mpirun -n P python mosaic_power.py CUBE0 OUTPUT --box L [--hubble h] [options]
 
@@ -66,6 +76,9 @@ def parse_args(argv=None):
                    help='divide P(k) by norm^2, e.g. 3e5 to express velocities in units of c (default 1)')
     p.add_argument('--grid', type=int, nargs=2, metavar=('PX', 'PY'),
                    help='MPI process grid; PX*PY must equal the number of ranks (default: as square as possible)')
+    p.add_argument('--unfold', action='store_true',
+                   help="divide each mode's power by the window of DTFE's average over one grid cell, "
+                        'W^2 = prod_i sinc^2(k_i d/2) (only for the cell-averaged a_* fields; default: off)')
     return p.parse_args(argv)
 
 
@@ -131,9 +144,24 @@ def kgrid(start, stop, G, L):
     return (w * np.float32(G)) / np.float32(L)
 
 
-def bin_power(field_hat, kslice, G, L, kedges, comm):
-    """Accumulate nbodykit-style 1d binning of |field_hat|^2 * L^3 on this rank."""
+def cell_window(start, stop, G):
+    """sin(k d/2)/(k d/2) along one axis for FFT indices start..stop-1, with k d/2 = pi n/G."""
+    n = np.arange(start, stop)
+    n = np.where(n >= G // 2, n - G, n)
+    return np.sinc(n / G)                           # numpy's sinc(x) is sin(pi x)/(pi x)
+
+
+def bin_power(field_hat, kslice, G, L, kedges, comm, unfold=False):
+    """Accumulate nbodykit-style 1d binning of |field_hat|^2 * L^3 on this rank.
+
+    With unfold=True, |field_hat|^2 of each mode is divided by the squared window of
+    an average over one grid cell, prod_i sinc^2(k_i d/2), before the binning.
+    """
     nbins = len(kedges) + 1
+    if unfold:
+        wx2 = cell_window(kslice[0].start, kslice[0].stop, G) ** 2
+        wyz2 = (cell_window(kslice[1].start, kslice[1].stop, G) ** 2)[:, None] * \
+               (cell_window(kslice[2].start, kslice[2].stop, G) ** 2)[None, :]
     x2edges = kedges**2
     kx = kgrid(kslice[0].start, kslice[0].stop, G, L)
     ky = kgrid(kslice[1].start, kslice[1].stop, G, L)
@@ -153,6 +181,8 @@ def bin_power(field_hat, kslice, G, L, kedges, comm):
         k2 = (kx2[i] + ky2) + kz2                   # same float32 order as nbodykit's slab.norm2()
         dig = np.digitize(k2.ravel(), x2edges)
         p = field_hat[i].real.astype(np.float64)**2 + field_hat[i].imag.astype(np.float64)**2
+        if unfold:
+            p /= wx2[i] * wyz2
         if has_dc and i == 0:
             p[0, 0] = 0.0                           # nbodykit clears the k=0 mode
         nsum += np.bincount(dig, weights=weight.ravel(), minlength=nbins)
@@ -179,7 +209,11 @@ def main(argv=None):
     t0 = time.time()
 
     pattern = file_pattern(args.cube0)
-    inverse_lengths = INVERSE_LENGTHS.get(pattern.rsplit('.', 1)[-1])
+    suffix = pattern.rsplit('.', 1)[-1]
+    if args.unfold and suffix in COMPONENTS and not suffix.startswith('a_'):
+        raise SystemExit(f"--unfold: '{suffix}' is point-sampled at the cell centres and has no cell-average "
+                         f"window; --unfold is only for the cell-averaged a_* fields")
+    inverse_lengths = INVERSE_LENGTHS.get(suffix)
     if args.hubble is not None:
         if args.hubble <= 0:
             raise SystemExit(f'--hubble must be positive, got {args.hubble}')
@@ -237,7 +271,7 @@ def main(argv=None):
         u_hat = fft.forward(normalize=True)         # (1/G^3) sum_x f(x) exp(-ikx), as pmesh
         t_fft = time.time() - t
         t = time.time()
-        k_c, p_c, n_c = bin_power(u_hat, kslice, G, args.box, kedges, comm)
+        k_c, p_c, n_c = bin_power(u_hat, kslice, G, args.box, kedges, comm, unfold=args.unfold)
         ksum, psum, nsum = k_c, psum + p_c, n_c
         comm.Barrier()
         if rank == 0:
@@ -257,6 +291,8 @@ def main(argv=None):
         header = (f'power spectrum of {pattern}\n'
                   f'{N}^3 cubes of {cube}^3 cells, grid {G}^3, box {args.box}, {ncomp} component(s) summed, '
                   f'P divided by norm^2 with norm = {args.norm}\n')
+        if args.unfold:
+            header += 'unfolded: |f_k|^2 divided by the one-cell average window prod_i sinc^2(k_i d/2), d = L/G\n'
         if args.hubble is None:
             header += 'k [1/box unit]   P(k) [box unit^3 * field^2 / norm^2]   modes'
         else:
